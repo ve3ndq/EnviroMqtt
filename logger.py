@@ -61,8 +61,8 @@ class EnvLogger:
         while True:
             try:
                 pm_data = pms.read()
-                #print (pm_data)
-
+                #print(pm_data)
+                 
 #                pm100 = pm_data.pm_per_1l_air(10.0)
 #                pm50  = pm_data.pm_per_1l_air(5.0) - pm100
 #                pm25  = pm_data.pm_per_1l_air(2.5) - pm100 - pm50
@@ -74,14 +74,16 @@ class EnvLogger:
                     "particulate/1.0": pm_data.pm_ug_per_m3(1.0, atmospheric_environment=True),
                     "particulate/2.5": pm_data.pm_ug_per_m3(2.5, atmospheric_environment=True),
                     "particulate/10.0": pm_data.pm_ug_per_m3(None, atmospheric_environment=True),
- #                   "particulate/pm100": pm100,
- #                   "particulate/pm50": pm50,
- #                   "particulate/pm25": pm25,
- #                   "particulate/pm10": pm10,
- #                   "particulate/pm5": pm5,
- #                   "particulate/pm3": pm3,
-
-
+                    "particulate/1.0-noatmos": pm_data.pm_ug_per_m3(1.0, atmospheric_environment=False),
+                    "particulate/2.5-noatmos": pm_data.pm_ug_per_m3(2.5, atmospheric_environment=False),
+                    "particulate/10-noatmos": pm_data.pm_ug_per_m3(10, atmospheric_environment=False),
+                    "particulate/pm_per_1l_air0.3": pm_data.pm_per_1l_air(0.3),
+                    "particulate/pm_per_1l_air0.5": pm_data.pm_per_1l_air(0.5),
+                    "particulate/pm_per_1l_air1.0": pm_data.pm_per_1l_air(1.0),
+                    "particulate/pm_per_1l_air2.5": pm_data.pm_per_1l_air(2.5),
+                    "particulate/pm_per_1l_air5": pm_data.pm_per_1l_air(5),
+                    "particulate/pm_per_1l_air10": pm_data.pm_per_1l_air(10),
+                    "PMDATA": pm_data,
 
 
                 }
@@ -111,17 +113,22 @@ class EnvLogger:
 
     def publish(self, topic, value):
         topic = self.prefix.strip("/") + "/" + topic
-        self.client.publish(topic, str(value))
-#        self.client.publish("ABCCCC","123")
+        #self.client.publish(topic, str(value))
+        self.client.publish(topic, value)
 
     def update(self, publish_readings=True):
         self.samples.append(self.take_readings())
 
         if publish_readings:
+            print (self.samples[0]["PMDATA"])
+
             for topic in self.samples[0].keys():
-                value_sum = sum([d[topic] for d in self.samples])
-                value_avg = value_sum / len(self.samples)
-                self.publish(topic, value_avg)
+                if topic != "PMDATA":
+                    value_sum = sum([d[topic] for d in self.samples])
+                    value_avg = value_sum / len(self.samples)
+                    self.publish(topic, value_avg)
+                else:
+                    self.publish(topic,str(self.samples[0]["PMDATA"]))
 
 
     def destroy(self):
