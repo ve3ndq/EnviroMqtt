@@ -1,5 +1,8 @@
 import collections, threading, traceback
 
+import colorsys
+import ST7735
+
 import paho.mqtt.client as mqtt
 
 try:
@@ -12,6 +15,84 @@ except ImportError:
 from bme280 import BME280
 from pms5003 import PMS5003
 from enviroplus import gas
+
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
+from fonts.ttf import RobotoMedium as UserFont
+import logging
+
+
+logging.basicConfig(
+    format='%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
+
+# Create ST7735 LCD display class
+st7735 = ST7735.ST7735(
+    port=0,
+    cs=1,
+    dc=9,
+    backlight=12,
+    rotation=270,
+    spi_speed_hz=10000000
+)
+
+# Initialize display
+st7735.begin()
+ 
+WIDTH = st7735.width
+HEIGHT = st7735.height
+
+# New canvas to draw on.
+img = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
+draw = ImageDraw.Draw(img)
+
+# Text settings.
+font_size = 10
+font = ImageFont.truetype(UserFont, font_size)
+text_colour = (255, 255, 255)
+back_colour = (0, 0, 0)
+
+message = "Starting Up"
+size_x, size_y = draw.textsize(message, font)
+
+# Calculate text position
+x = (WIDTH - size_x) / 2
+y = (HEIGHT / 2) - (size_y / 2)
+
+# Draw background rectangle and write text.
+draw.rectangle((0, 0, 160, 80), back_colour)
+draw.text((x, y), message, font=font, fill=text_colour)
+st7735.display(img)
+
+i = 0
+
+
+
+def display_text(newline):
+    global i
+    global img
+
+    if i==0:
+        img = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
+ 
+    i = i + 1
+    if i>5:
+        i=0
+        img = Image.new('RGB', (WIDTH, HEIGHT), color=(0, 0, 0))
+   
+ 
+    draw = ImageDraw.Draw(img)
+    message=""
+    message=message+newline
+    
+    # Write the text at the top in black
+    draw.text((0, i*font_size), message, font=font, fill=(255,255,255))
+    st7735.display(img)
+
+
+
 
 
 class EnvLogger:
@@ -115,13 +196,21 @@ class EnvLogger:
         topic = self.prefix.strip("/") + "/" + topic
         #self.client.publish(topic, str(value))
         self.client.publish(topic, value)
+        #if topic != "ENVIRO/PMDATA":
+        #    display_text(right(str(topic)+str(value),20))
+        if topic in ["ENVIRO/particulate/1.0","ENVIRO/particulate/2.5","ENVIRO/particulate/10.0","ENVIRO/temperature","ENVIRO/humidity"]:
+            display_text(right(str(topic)+"-"+str(value),30))
+            
+
+
+
 
     def update(self, publish_readings=True):
+        global i
         self.samples.append(self.take_readings())
 
         if publish_readings:
-            print (self.samples[0]["PMDATA"])
-
+            i=0
             for topic in self.samples[0].keys():
                 if topic != "PMDATA":
                     value_sum = sum([d[topic] for d in self.samples])
@@ -134,3 +223,14 @@ class EnvLogger:
     def destroy(self):
         self.client.disconnect()
         self.client.loop_stop()
+
+
+
+def left(s, amount):
+    return s[:amount]
+
+def right(s, amount):
+    return s[-amount:]
+
+def mid(s, offset, amount):
+    return s[offset:offset+amount]
